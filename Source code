@@ -1,0 +1,83 @@
+/**
+ * Example program demonstrating UNIX pipes.
+ *
+ * The program writes to pipe in child process and reads pipe and calculates time elapsed in parent process.
+ *
+ * @author Zizeng Li
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <string.h>
+#include <sys/time.h>
+#include <sys/wait.h>
+
+
+#define BUFFER_SIZE 25
+#define READ_END	0
+#define WRITE_END	1
+
+int main(int argc, char **argv)
+{
+	/* Initialize struct timeval type*/
+	struct timeval begin;
+	struct timeval end;
+	struct timeval readit;
+	/* Initialize variable for further operating long digit type from gettimeofday*/
+	long second;
+	long microsecond;
+	/* Initialize pid for distinguishing parent / child process*/
+	pid_t pid;
+	/* Use fd to distinguish read end and write end*/
+	int fd[2];
+
+	/* create the pipe */
+	if (pipe(fd) == -1) {
+		fprintf(stderr,"Pipe failed");
+		return 1;
+	}
+	/* Create a child process*/
+	pid = fork();
+	/* Give error message if fork failed*/
+	if (pid < 0) {
+		fprintf(stderr, "Fork failed");
+		return 1;
+	}
+	/* Child process*/
+	if (pid == 0) 
+    {
+		/* Store output of gettimeofday to begin*/
+		gettimeofday(&begin, NULL);
+		/* close read end in child process*/
+		close(fd[READ_END]);
+		/* Write begin to pipe through giving its address and size*/
+		write(fd[WRITE_END], &begin , sizeof(struct timeval)); 
+		/* Close write end after writing*/
+		close(fd[WRITE_END]);
+		/* execute() */
+        execlp(argv[1], argv[1], NULL);
+	}
+	else 
+    {
+		/* Wait until finish of child process*/
+		wait(NULL);
+		/*Store output of gettimeofday to end*/
+        gettimeofday(&end, NULL);
+		/* close write end in parent process*/
+		close(fd[WRITE_END]);
+		/* Read from pipe and store the timeval struct to readit*/
+		read(fd[READ_END], &readit, sizeof(struct timeval));
+		/* Do calculation stuff of elapsed time*/
+		second = end.tv_sec - readit.tv_sec;
+		microsecond = end.tv_usec - readit.tv_usec;
+		/* Print the elapsed time*/
+		printf("Second elapsed is %ld, Microsecond elapsed is %ld\n", second, microsecond);
+		printf("Total elapsed is %f\n", second + microsecond*1e-6);
+		/* Close read end after reading*/
+		close(fd[READ_END]);
+	}
+
+	return 0;
+}
+
